@@ -1,0 +1,11 @@
+services:
+  loader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/data
+      - ~/.config/gcloud:/root/.config/gcloud
+    # entrypoint: gdalwarp data/30S_20220101-20230101.tif -of COG -co COMPRESS=DEFLATE -co TILING_SCHEME=GoogleMapsCompatible data/30S_20220101-20230101_quadbin.tif
+    # entrypoint: carto bigquery upload --file_path data/30S_20220101-20230101_quadbin.tif --project cartodb-on-gcp-datascience --dataset environmental_scoring --table 30S_20220101-20230101_quadbin --output_quadbin
+    
