@@ -3,16 +3,10 @@
 # Filenames used for input and output
 INPUT_FILE=$(gum input \
     --header="Input file name (within ./data)" \
-    --value="30S_20220101-20230101.tif"
-)
-
-OUTPUT_FILE=$(gum input \
-    --header="Output file name (within ./data)" \
-    --value="30S_20220101-20230101_quadbin.tif"
+    --value="land_cover_urls.txt"
 )
 
 INPUT_PATH="./data/$INPUT_FILE"
-OUTPUT_PATH="./data/$OUTPUT_FILE"
 
 # Google Cloud variables
 GCP_PROJECT=$(gum input \
@@ -27,23 +21,37 @@ GCP_DATASET=$(gum input \
 
 GCP_TABLE=$(gum input \
     --header="Google Cloud Platform table to upload the data" \
-    --value="30S_20220101-20230101_quadbin"
+    --value="land_cover_raster"
 )
 
-echo "Input file: $INPUT_PATH"
-echo "Output file: $OUTPUT_PATH"
+# Loop the URL text file and download each file
+while read -r url; do
+    echo "Downloading from $url..."
 
-# # Loading process
-# gdalwarp "$INPUT_PATH" \
-#     -of COG \
-#     -co COMPRESS=DEFLATE \
-#     -co TILING_SCHEME=GoogleMapsCompatible \
-#     -tr 1000 1000 \
-#     "$OUTPUT_PATH" 
+    # TODO: no reason to assume it will be tif
+    curl -o "./data/tmp_file.tif" "$url"
 
-carto bigquery upload \
-    --file_path "$OUTPUT_PATH" \
-    --project "$GCP_PROJECT" \
-    --dataset "$GCP_DATASET" \
-    --table "$GCP_TABLE" \
-    --output_quadbin
+    # Reproject the file
+    gdalwarp "./data/tmp_file.tif" \
+        -of COG \
+        -co COMPRESS=DEFLATE \
+        -co TILING_SCHEME=GoogleMapsCompatible \
+        -tr 1000 1000 \
+        -r mode \
+        ./data/tmp_file_reprojected.tif
+
+
+    # Upload the file to BigQuery - we say yes to append
+    echo "yes" | carto bigquery upload \
+        --file_path ./data/tmp_file_reprojected.tif \
+        --project "$GCP_PROJECT" \
+        --dataset "$GCP_DATASET" \
+        --table "$GCP_TABLE" \
+        --output_quadbin
+
+    # Remove the file
+    rm ./data/tmp_file.tif ./data/tmp_file_reprojected.tif
+        
+    echo "Done with $url"
+
+done <"$INPUT_PATH"
